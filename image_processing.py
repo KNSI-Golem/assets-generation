@@ -1,15 +1,10 @@
 import os
-#import imageio
-#import cv2
 from PIL import Image
 import numpy as np
-import pandas as pd
 import re
 import shutil
-import sys
 import collections
 import six
-import image_statistics
 import gifextract
 
 def is_iterable(arg):

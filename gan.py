@@ -1,11 +1,8 @@
 # example of a dcgan on cifar10
-from numpy import expand_dims
 from numpy import zeros
 from numpy import ones
-from numpy import vstack
 from numpy.random import randn
 from numpy.random import randint
-from keras.datasets.cifar10 import load_data
 from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.layers import Dense
@@ -15,9 +12,7 @@ from keras.layers import Conv2D
 from keras.layers import Conv2DTranspose
 from keras.layers import LeakyReLU
 from keras.layers import Dropout
-from matplotlib import pyplot
 
-import image_processing
 import numpy as np
 
 from PIL import Image
@@ -82,16 +77,6 @@ def define_gan(g_model, d_model):
 	opt = Adam(lr=0.0002, beta_1=0.5)
 	model.compile(loss='binary_crossentropy', optimizer=opt)
 	return model
- 
-# load and prepare cifar10 training images
-def load_real_samples():
-	# load cifar10 dataset
-	(trainX, _), (_, _) = load_data()
-	# convert from unsigned ints to floats
-	X = trainX.astype('float32')
-	# scale from [0,255] to [-1,1]
-	X = (X - 127.5) / 127.5
-	return X
  
 # select real samples
 def generate_real_samples(dataset, n_samples):
