@@ -19,23 +19,30 @@ def get_statistics(input_path):
         
         width, height = image.size
         pixels_nr = width * height
-        non_background_pixels_count = (arr[:, :, 3] != 0).sum()
-        image_background_percentage = 1.0 - non_background_pixels_count / pixels_nr
-        
-        non_background_pixels_counts.append(non_background_pixels_count)
+        if arr.shape[2] == 4:   
+            non_background_pixels_count = (arr[:, :, 3] != 0).sum()
+            image_background_percentage = 1.0 - non_background_pixels_count / pixels_nr
+            
+            non_background_pixels_counts.append(non_background_pixels_count)
+            image_background_percentages.append(image_background_percentage)
         pixels_counts.append(pixels_nr)
         image_widths.append(width)
         image_heights.append(height)
-        image_background_percentages.append(image_background_percentage)
         
         image.close()
-        
-    return pd.DataFrame({'Path': image_paths,
-                         'Pixels_count': pixels_counts,
-                         'Width': image_widths,
-                         'Height': image_heights,
-                         'Background_percentage': image_background_percentages
-                         })
+    if arr.shape[2] == 4:  
+        return pd.DataFrame({'Path': image_paths,
+                             'Pixels_count': pixels_counts,
+                             'Width': image_widths,
+                             'Height': image_heights,
+                             'Background_percentage': image_background_percentages
+                             })
+    else:
+        return pd.DataFrame({'Path': image_paths,
+                             'Pixels_count': pixels_counts,
+                             'Width': image_widths,
+                             'Height': image_heights,
+                             })
         
 
 if __name__ == '__main__':

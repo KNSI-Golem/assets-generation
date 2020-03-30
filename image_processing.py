@@ -6,6 +6,8 @@ import shutil
 import collections
 import six
 import gifextract
+import gan
+import image_statistics
 
 def is_iterable(arg):
     return (
@@ -45,7 +47,8 @@ def close_all_frames(frames):
         frame.close()
 
 def process_images(input_path, output_path, res_needed=None, resize_source_to=None,
-                   resize_output_to=None, change_mode_to=None, use_all_frames=True,
+                   resize_output_to=None, pad_output=False,
+                   change_mode_to=None, use_all_frames=True,
                    crop_images=False, n_boxes_width=1, n_boxes_height=1, 
                    change_background_to=None):
     
@@ -108,14 +111,29 @@ def process_images(input_path, output_path, res_needed=None, resize_source_to=No
                         box = frame.crop(box)
                         
                         if resize_output_to is not None and box.size != resize_output_to:
-                            box = resize_image(box, resize_output_to)
+                            if pad_output:
+                                size = box.size
+                                new_im = Image.new(box.mode, resize_output_to, change_background_to)
+                                new_im.paste(box, ((resize_output_to[0] - size[0]) // 2,
+                                                   (resize_output_to[1] - size[1]) // 2))
+                                box = new_im
+                            else:
+                                box = resize_image(box, resize_output_to)
                            
                         image_name_full = f'{image_name}_frame{frame_nr}_y{y_pos}_x{w//box_width}.png'                            
                         box.save(f'{output_path}/' + image_name_full)
                         box.close()
             else:
                 if resize_output_to is not None and frame.size != resize_output_to:
-                    frame = resize_image(frame, resize_output_to)
+                    if pad_output:
+                        size = frame.size
+                        new_im = Image.new(frame.mode, resize_output_to, change_background_to)
+                        new_im.paste(frame, ((resize_output_to[0] - size[0]) // 2,
+                                           (resize_output_to[1] - size[1]) // 2))
+                        frame = new_im
+                    else:
+                        frame = resize_image(frame, resize_output_to)
+                    
                 image_name_full = f'{image_name}_frame{frame_nr}.png'                            
                 frame.save(f'{output_path}/' + image_name_full)
             frame_nr += 1
@@ -175,3 +193,42 @@ def fetch_images(input_path, output_path, frame=None, y=None, x=None):
             continue
         
         shutil.copy(image_path, f'{output_path}/{image_name}.png')
+        
+def make_samples(real_output, fake_output, generator, real_input,
+                 image_size, latent_dim=100, n_samples=100): 
+       
+    preview_margin = 0
+    n_rows = 1
+    n_cols = 1
+    
+    if not os.path.exists(fake_output):
+        os.makedirs(real_output)
+    else:
+        shutil.rmtree(fake_output, ignore_errors=True)
+        os.makedirs(fake_output)
+    
+    for i in range(n_samples):
+        vec = gan.generate_latent_points(latent_dim, 1)
+        gan.save_images(i, n_cols, n_rows, vec, fake_output,
+                        generator, preview_margin=preview_margin, image_size=image_size)
+        
+    df = image_statistics.get_statistics(real_input)
+    sample_df = df.sample(n_samples)['Path']
+    if not os.path.exists(real_output):
+        os.makedirs(real_output)
+    else:
+        shutil.rmtree(real_output, ignore_errors=True)
+        os.makedirs(real_output)
+    
+    process_images(sample_df, real_output)
+
+if __name__ == '__main__':
+    generator = gan.define_generator(100, (48, 48))
+    generator.load_weights('./gan_results_square48_6/generator_models/generator_model_1000.h5')
+    
+    real_output = './real_images'
+    fake_output = './fake_images'
+    real_input = './images_for_training_square48_6'
+    image_size = (48, 48)
+    
+    make_samples(real_output, fake_output, generator, real_input, image_size, n_samples=1000)

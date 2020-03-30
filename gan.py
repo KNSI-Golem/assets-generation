@@ -19,49 +19,56 @@ from PIL import Image
 import os
  
 # define the standalone discriminator model
-def define_discriminator(in_shape=(32,32,3)):
-	model = Sequential()
+def define_discriminator(in_shape):
+    model = Sequential()
 	# normal
-	model.add(Conv2D(64, (3,3), padding='same', input_shape=in_shape))
-	model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2D(64, (3,3), padding='same', input_shape=in_shape))
+    model.add(LeakyReLU(alpha=0.2))
 	# downsample
-	model.add(Conv2D(128, (3,3), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2D(128, (3,3), strides=(2,2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
 	# downsample
-	model.add(Conv2D(128, (3,3), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2D(128, (3,3), strides=(2,2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
 	# downsample
-	model.add(Conv2D(256, (3,3), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv2D(256, (3,3), strides=(2,2), padding='same'))   
+    model.add(LeakyReLU(alpha=0.2))
 	# classifier
-	model.add(Flatten())
-	model.add(Dropout(0.4))
-	model.add(Dense(1, activation='sigmoid'))
+    model.add(Flatten())
+    model.add(Dropout(0.4))
+    model.add(Dense(1, activation='sigmoid'))
 	# compile model
-	opt = Adam(lr=0.0002, beta_1=0.5)
-	model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
-	return model
+    opt = Adam(lr=0.0002, beta_1=0.5)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+    return model
  
 # define the standalone generator model
-def define_generator(latent_dim):
-	model = Sequential()
+def define_generator(latent_dim, output_shape):
+    model = Sequential()
+    
+    start_width = output_shape[0] // 8
+    #width_pad = output_shape[0] - start_width * 8
+    start_height = output_shape[1] // 8
+    #height_pad = output_shape[1] - start_height * 8
+    
 	# foundation for 4x4 image
-	n_nodes = 256 * 4 * 4
-	model.add(Dense(n_nodes, input_dim=latent_dim))
-	model.add(LeakyReLU(alpha=0.2))
-	model.add(Reshape((4, 4, 256)))
-	# upsample to 8x8
-	model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
-	# upsample to 16x16
-	model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
-	# upsample to 32x32
-	model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
-	model.add(LeakyReLU(alpha=0.2))
+    n_nodes = 256 * start_width * start_height
+    model.add(Dense(n_nodes, input_dim=latent_dim))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Reshape((start_width, start_height, 256)))
+	# upsample to 2*start_width x 2*start_height
+    model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
+	# upsample to 4*start_width x 4*start_height
+    model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
+	# upsample to 8*start_width x 8*start_height
+    model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
+    model.add(LeakyReLU(alpha=0.2))
+
 	# output layer
-	model.add(Conv2D(3, (3,3), activation='tanh', padding='same'))
-	return model
+    model.add(Conv2D(3, (3,3), activation='tanh', padding='same'))
+    return model
  
 # define the combined generator and discriminator model, for updating the generator
 def define_gan(g_model, d_model):
@@ -123,8 +130,6 @@ def summarize_performance(epoch, g_model, d_model, dataset, latent_dim, n_sample
 def train(g_model, d_model, gan_model, dataset, latent_dim, output_path, n_epochs=200, n_batch=128):
     bat_per_epo = int(dataset.shape[0] / n_batch)
     half_batch = int(n_batch / 2)
-    #real_batch = int(n_batch * 0.8)
-    #fake_batch = int(n_batch * 0.2)
 
     seed = generate_latent_points(latent_dim, 54)
 	# manually enumerate epochs
@@ -148,43 +153,46 @@ def train(g_model, d_model, gan_model, dataset, latent_dim, output_path, n_epoch
             # summarize loss on this batch
             print('>%d, %d/%d, d1=%.3f, d2=%.3f g=%.3f' %
 				(i+1, j+1, bat_per_epo, d_loss1, d_loss2, g_loss))
-        # evaluate the model performance, sometimes
-        if (i+1) % 10 == 0:
+            
+        if not (i+1) % 10 or not i:
             summarize_performance(i, g_model, d_model, dataset, latent_dim)
-        
-        if not i % 10:
             # save images:
             epoch_nr = i + 1
-            save_images(epoch_nr, 9, 6, seed, output_path + '/images', g_model)
+            save_images(epoch_nr, 9, 6, seed, output_path + '/images', g_model,
+                        image_size=(X_fake.shape[1], X_fake.shape[2]))
             # save the generator model tile file
-            save_model_path = f'{output_path}/generator_models'
-            if not os.path.exists(save_model_path):
-                os.makedirs(save_model_path)
-            g_model.save(save_model_path + f'/generator_model_{epoch_nr}.h5')
-            
-def save_images(epoch, n_cols, n_rows, seed, output_path, model, preview_margin=16, image_size=32):
+            save_generator_path = f'{output_path}/generator_models'
+            save_discriminator_path = f'{output_path}/discriminator_models'
+            if not os.path.exists(save_generator_path):
+                os.makedirs(save_generator_path)
+            if not os.path.exists(save_discriminator_path):
+                os.makedirs(save_discriminator_path)
+            g_model.save(save_generator_path + f'/generator_model_{epoch_nr}.h5')
+            d_model.save(save_discriminator_path + f'/discriminator_model_{epoch_nr}.h5')
+    
+def save_images(epoch, n_cols, n_rows, seed, output_path, model, preview_margin=16, image_size=(32, 32)):
     
     image_array = np.full(( 
-    			preview_margin + (n_rows * (image_size+preview_margin)), 
-    			preview_margin + (n_cols * (image_size+preview_margin)), 3), 
+    			preview_margin + (n_rows * (image_size[1]+preview_margin)), 
+    			preview_margin + (n_cols * (image_size[0]+preview_margin)), 3), 
     255, dtype=np.uint8)
-
+                
     generated_images = model.predict(seed)
-    
+    generated_images = generated_images.reshape(seed.shape[0], image_size[1], image_size[0], 3)
     generated_images = 0.5 * generated_images + 0.5
 
     image_count = 0
     for row in range(n_rows):
         for col in range(n_cols):
-            r = row * (image_size+preview_margin) + preview_margin
-            c = col * (image_size+preview_margin) + preview_margin
+            r = row * (image_size[1]+preview_margin) + preview_margin
+            c = col * (image_size[0]+preview_margin) + preview_margin
 
-            image_array[r:r+image_size,c:c+image_size] = generated_images[image_count] * 255
+            image_array[r:r+image_size[1],c:c+image_size[0]] = generated_images[image_count] * 255
             image_count += 1
     
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     
     filename = os.path.join(output_path,f"train-{epoch}.png")
-    im = Image.fromarray(image_array)
+    im = Image.fromarray(image_array, mode='RGB')
     im.save(filename)
