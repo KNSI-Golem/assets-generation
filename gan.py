@@ -79,37 +79,6 @@ def define_generator(latent_dim, output_shape):
     model.add(Conv2D(3, (3,3), activation='tanh', padding='same'))
     return model
 
-def define_generator_2(latent_dim, output_shape):
-    model = Sequential()
-    model.add(Dense(256, input_dim=latent_dim))
-    model.add(Reshape((1, 1, 256)))
-    model.add(Conv2DTranspose(512, (3, 2), kernel_initializer=RandomUniform()))
-    #model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    # 3x3
-    model.add(Conv2DTranspose(256, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
-    #model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    # 6x6
-    model.add(Conv2DTranspose(128, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
-    #model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    # 12x12
-    model.add(Conv2DTranspose(64, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
-    #model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    # 24x24
-    # Extra layer
-    model.add(Conv2DTranspose(64, (3, 3), padding='same', kernel_initializer=RandomUniform()))
-    #model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    # 24x24
-    model.add(Conv2DTranspose(3, (4, 4), padding='same', activation='tanh',
-                              strides=(2, 2), kernel_initializer=RandomUniform()))
-    # 48x48
-    
-    return model
-
 # define the combined generator and discriminator model, for updating the generator
 def define_gan(g_model, d_model):
 	# make weights in the discriminator not trainable
