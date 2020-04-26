@@ -3,15 +3,24 @@ from numpy import zeros
 from numpy import ones
 from numpy.random import randn
 from numpy.random import randint
-from keras.optimizers import Adam
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import Reshape
-from keras.layers import Flatten
-from keras.layers import Conv2D
-from keras.layers import Conv2DTranspose
-from keras.layers import LeakyReLU
-from keras.layers import Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Reshape
+from tensorflow.keras.layers import Flatten
+#from keras.layers import Conv2D
+#from keras.layers import Conv2DTranspose
+#from keras.layers import LeakyReLU
+from tensorflow.keras.layers import Dropout
+
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Conv2DTranspose
+from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.initializers import glorot_uniform
+from tensorflow.keras.initializers import RandomUniform
+from tensorflow.keras import Input
+from tensorflow.keras import Model
 
 import numpy as np
 
@@ -38,8 +47,8 @@ def define_discriminator(in_shape):
     model.add(Dropout(0.4))
     model.add(Dense(1, activation='sigmoid'))
 	# compile model
-    opt = Adam(lr=0.0002, beta_1=0.5)
-    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+    opt = Adam(lr=0.0004, beta_1=0.5)
+    model.compile(loss='mae', optimizer=opt, metrics=['accuracy'])
     return model
  
 # define the standalone generator model
@@ -55,7 +64,7 @@ def define_generator(latent_dim, output_shape):
     n_nodes = 256 * start_width * start_height
     model.add(Dense(n_nodes, input_dim=latent_dim))
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((start_width, start_height, 256)))
+    model.add(Reshape((start_height, start_width , 256)))
 	# upsample to 2*start_width x 2*start_height
     model.add(Conv2DTranspose(128, (4,4), strides=(2,2), padding='same'))
     model.add(LeakyReLU(alpha=0.2))
@@ -69,7 +78,38 @@ def define_generator(latent_dim, output_shape):
 	# output layer
     model.add(Conv2D(3, (3,3), activation='tanh', padding='same'))
     return model
- 
+
+def define_generator_2(latent_dim, output_shape):
+    model = Sequential()
+    model.add(Dense(256, input_dim=latent_dim))
+    model.add(Reshape((1, 1, 256)))
+    model.add(Conv2DTranspose(512, (3, 2), kernel_initializer=RandomUniform()))
+    #model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    # 3x3
+    model.add(Conv2DTranspose(256, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
+    #model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    # 6x6
+    model.add(Conv2DTranspose(128, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
+    #model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    # 12x12
+    model.add(Conv2DTranspose(64, (4, 4), padding='same', strides=(2, 2), kernel_initializer=RandomUniform()))
+    #model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    # 24x24
+    # Extra layer
+    model.add(Conv2DTranspose(64, (3, 3), padding='same', kernel_initializer=RandomUniform()))
+    #model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    # 24x24
+    model.add(Conv2DTranspose(3, (4, 4), padding='same', activation='tanh',
+                              strides=(2, 2), kernel_initializer=RandomUniform()))
+    # 48x48
+    
+    return model
+
 # define the combined generator and discriminator model, for updating the generator
 def define_gan(g_model, d_model):
 	# make weights in the discriminator not trainable
@@ -81,8 +121,8 @@ def define_gan(g_model, d_model):
 	# add the discriminator
 	model.add(d_model)
 	# compile model
-	opt = Adam(lr=0.0002, beta_1=0.5)
-	model.compile(loss='binary_crossentropy', optimizer=opt)
+	opt = Adam(lr=0.0001, beta_1=0.5)
+	model.compile(loss='mae', optimizer=opt)
 	return model
  
 # select real samples
@@ -92,7 +132,7 @@ def generate_real_samples(dataset, n_samples):
 	# retrieve selected images
 	X = dataset[ix]
 	# generate 'real' class labels (1)
-	y = ones((n_samples, 1))
+	y = ones((n_samples, 1)) * 0.9
 	return X, y
  
 # generate points in latent space as input for the generator
@@ -110,7 +150,7 @@ def generate_fake_samples(g_model, latent_dim, n_samples):
 	# predict outputs
 	X = g_model.predict(x_input)
 	# create 'fake' class labels (0)
-	y = zeros((n_samples, 1))
+	y = ones((n_samples, 1)) * 0.1
 	return X, y
  
 # evaluate the discriminator, plot generated images, save generator model
@@ -172,22 +212,23 @@ def train(g_model, d_model, gan_model, dataset, latent_dim, output_path, n_epoch
     
 def save_images(epoch, n_cols, n_rows, seed, output_path, model, preview_margin=16, image_size=(32, 32)):
     
-    image_array = np.full(( 
-    			preview_margin + (n_rows * (image_size[1]+preview_margin)), 
-    			preview_margin + (n_cols * (image_size[0]+preview_margin)), 3), 
-    255, dtype=np.uint8)
+    height = image_size[0]
+    width = image_size[1]
+    
+    image_array = np.full((preview_margin + (n_rows * (height+preview_margin)), 
+                           preview_margin + (n_cols * (width+preview_margin)), 3), 
+                          255, dtype=np.uint8)
                 
     generated_images = model.predict(seed)
-    generated_images = generated_images.reshape(seed.shape[0], image_size[1], image_size[0], 3)
     generated_images = 0.5 * generated_images + 0.5
 
     image_count = 0
     for row in range(n_rows):
         for col in range(n_cols):
-            r = row * (image_size[1]+preview_margin) + preview_margin
-            c = col * (image_size[0]+preview_margin) + preview_margin
-
-            image_array[r:r+image_size[1],c:c+image_size[0]] = generated_images[image_count] * 255
+            r = row * (height+preview_margin) + preview_margin
+            c = col * (width+preview_margin) + preview_margin
+            
+            image_array[r:r+height,c:c+width] = generated_images[image_count] * 255
             image_count += 1
     
     if not os.path.exists(output_path):

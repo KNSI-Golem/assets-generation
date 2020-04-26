@@ -4,20 +4,18 @@ import gan
 
 if __name__ == '__main__':    
     input_path = './bin'
-    processing_output = './results_processing'
-    fetching_output = './results_fetching'
-    images_for_training = './images_for_training_square'
-    gan_results = './gan_results_square'
-    output_shape = (48, 48)
+    output_shape = (32, 48)
+    processing_output = f'./processed/results_processing_{output_shape[0]}x{output_shape[1]}'
+    images_for_training = f'./for_training/images_for_{output_shape[0]}x{output_shape[1]}'
+    gan_results = f'./results/gan_results_new_architecture_{output_shape[0]}x{output_shape[1]}_1'
     
     image_processing.process_images(input_path, processing_output, change_mode_to='RGBA',
-                                    resize_output_to=output_shape, pad_output=True,
+                                    resize_output_to=output_shape, pad_output=False,
                                     change_background_to=(255, 255, 255, 0),
-                                    crop_images=True, n_boxes_width=4, n_boxes_height=4)
-    
-    image_processing.fetch_images(processing_output, fetching_output, frame=0, y=0, x=0)
-    
-    df = image_statistics.get_statistics(fetching_output)
+                                    crop_images=True, n_boxes_rows=4, n_boxes_cols=4,
+                                    get_boxes_col=0, get_boxes_row=0)
+        
+    df = image_statistics.get_statistics(processing_output)
     
     min_val = df['Background_percentage'].quantile(0.08)
     max_val = df['Background_percentage'].quantile(0.92)
@@ -31,7 +29,7 @@ if __name__ == '__main__':
     # size of the latent space
     latent_dim = 100
     # create the discriminator
-    d_model = gan.define_discriminator((output_shape[0], output_shape[1], 3))
+    d_model = gan.define_discriminator((output_shape[1], output_shape[0], 3))
     #d_model.summary()
     # create the generator
     g_model = gan.define_generator(latent_dim, output_shape=output_shape)
@@ -41,5 +39,5 @@ if __name__ == '__main__':
     gan_model = gan.define_gan(g_model, d_model)
     
     # train model
-    gan.train(g_model, d_model, gan_model, training_data, latent_dim, gan_results, n_epochs=1000, n_batch=128)
+    gan.train(g_model, d_model, gan_model, training_data, latent_dim, gan_results, n_epochs=50, n_batch=128)
     

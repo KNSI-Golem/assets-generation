@@ -6,7 +6,6 @@ import shutil
 import collections
 import six
 import gifextract
-import gan
 import image_statistics
 
 def is_iterable(arg):
@@ -32,7 +31,7 @@ def get_images_paths(input_path):
         
         for item in items:
             extension = item[-4:]
-            if extension != '.gif' and extension != '.png':
+            if extension != '.gif' and extension != '.png' and extension != '.jpg':
                 # we assume that item is actually a directory
                 new_items = os.listdir(item)
                 for new_item in new_items:
@@ -48,10 +47,11 @@ def close_all_frames(frames):
 
 def process_images(input_path, output_path, res_needed=None, resize_source_to=None,
                    resize_output_to=None, pad_output=False,
-                   change_mode_to=None, use_all_frames=True,
-                   crop_images=False, n_boxes_width=1, n_boxes_height=1, 
+                   change_mode_to=None, use_all_frames=False,
+                   crop_images=False, n_boxes_cols=1, n_boxes_rows=1, 
+                   get_boxes_col='all', get_boxes_row='all',
                    change_background_to=None):
-    
+
     images_paths = get_images_paths(input_path)
     
     if output_path is not None and not os.path.exists(f'{output_path}'):
@@ -101,12 +101,16 @@ def process_images(input_path, output_path, res_needed=None, resize_source_to=No
             
             if crop_images:
                 imgwidth, imgheight = frame.size
-                box_height = imgheight // n_boxes_height
-                box_width = imgwidth // n_boxes_width
-
+                box_height = imgheight // n_boxes_rows
+                box_width = imgwidth // n_boxes_cols
+                
                 for h in range(0, imgheight, box_height):
+                    if get_boxes_row != 'all':
+                        if h // box_height != get_boxes_row: continue
                     y_pos = h // box_height
                     for w in range(0, imgwidth, box_width):
+                        if get_boxes_col != 'all':
+                            if w // box_width != get_boxes_col: continue
                         box = (w, h, w+box_width, h+box_height)
                         box = frame.crop(box)
                         
@@ -157,7 +161,7 @@ def get_data_from_images(input_path):
         
     width, height = image.size
     bands_nr = len(image.getbands())
-    new_shape = (len(training_data), width, height, bands_nr)
+    new_shape = (len(training_data), height, width, bands_nr)
 
     training_data = np.reshape(training_data, new_shape)
     training_data = training_data.astype(np.float32)
@@ -221,14 +225,3 @@ def make_samples(real_output, fake_output, generator, real_input,
         os.makedirs(real_output)
     
     process_images(sample_df, real_output)
-
-if __name__ == '__main__':
-    generator = gan.define_generator(100, (48, 48))
-    generator.load_weights('./gan_results_square48_6/generator_models/generator_model_1000.h5')
-    
-    real_output = './real_images'
-    fake_output = './fake_images'
-    real_input = './images_for_training_square48_6'
-    image_size = (48, 48)
-    
-    make_samples(real_output, fake_output, generator, real_input, image_size, n_samples=1000)
