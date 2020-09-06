@@ -1,0 +1,7 @@
+{
+  "real_samples_multiplier": 1.0,
+  "fake_samples_multiplier": 0.0,
+  "discriminator_batches": 1,
+  "n_epochs": 2000,
+  "n_batch": 128
+}
