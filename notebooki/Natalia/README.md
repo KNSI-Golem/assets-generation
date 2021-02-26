@@ -55,3 +55,19 @@ Model był trenowany przez 1500 epok.
 ![1](images/0_5_10_20.png)
 
 ![2](images/0_5_10_20_1.png)
+
+### Wyniki ze StyleGANa
+
+#### Przykładowe epoki
+
+![](images/stylegan_epoch_example1.png)
+
+![](images/stylegan_epoch_example2.png)
+
+![](images/stylegan_epoch_example3.png)
+
+#### Interpolacje pomiędzy obrazami
+
+![](images/stylegan_interpolation_1.gif)
+
+![](images/stylegan_interpolation_1.gif)
