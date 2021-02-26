@@ -71,3 +71,10 @@ Model był trenowany przez 1500 epok.
 ![](images/stylegan_interpolation_1.gif)
 
 ![](images/stylegan_interpolation_1.gif)
+
+#### Próba obrotu postaci
+
+![](images/stylegan_directions1.png)
+
+![](images/stylegan_directions2.png)
+
