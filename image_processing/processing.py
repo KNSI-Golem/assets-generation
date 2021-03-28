@@ -47,8 +47,9 @@ def pad_img(img, pad_left=0, pad_right=0, pad_top=0, pad_bottom=0):
 def process_images(path, base_res=None, row_col_coords=[(0, 0)], resize_to=None,
                    resample=Image.NEAREST, background=(255.0, 255.0, 255.0),
                    pad_left=0, pad_right=0, pad_top=0, pad_bottom=0,
-                   normalize=True):
+                   normalize=True, return_path=False):
     paths = get_images_paths(path) # get all images paths
+    new_paths = []
     images = []
     for path in paths:
         img = Image.open(path)
@@ -79,8 +80,10 @@ def process_images(path, base_res=None, row_col_coords=[(0, 0)], resize_to=None,
             # pad image
             if pad_left or pad_right or pad_top or pad_bottom:
                box = pad_img(img, pad_left, pad_right, pad_top, pad_bottom)
-
+            
             images.append(box)
+            if return_path:
+                new_paths.append(path)
             
     images = np.array(images)
     if normalize:
@@ -89,7 +92,10 @@ def process_images(path, base_res=None, row_col_coords=[(0, 0)], resize_to=None,
         images = np.round(images)
         images = images.astype(np.uint8)
         
-    return images
+    if return_path:
+        return images, new_paths
+    else:
+        return images
 
 def make_preview(images, cols, margin=(8, 12), filepath=None, denormalize=True):
     n_images = images.shape[0]
